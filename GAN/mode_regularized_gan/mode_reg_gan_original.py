@@ -101,22 +101,22 @@ D_reg = discriminator(G_sample_reg)
 mse = tf.reduce_sum((X - G_sample_reg)**2, 1)
 
 D_loss = -tf.reduce_mean(tf.log(D_real) + tf.log(1 - D_fake))
-E_loss = tf.reduce_mean(lam1 * mse - lam2 * tf.log(D_reg))
+E_loss = tf.reduce_mean(lam1 * mse + lam2 * D_reg)
 G_loss = -tf.reduce_mean(tf.log(D_fake)) + E_loss
 
-E_solver = (tf.train.AdamOptimizer(learning_rate=1e-4)
+E_solver = (tf.train.AdamOptimizer(learning_rate=1e-3)
             .minimize(E_loss, var_list=theta_E))
-D_solver = (tf.train.AdamOptimizer(learning_rate=1e-4)
+D_solver = (tf.train.AdamOptimizer(learning_rate=1e-3)
             .minimize(D_loss, var_list=theta_D))
-G_solver = (tf.train.AdamOptimizer(learning_rate=1e-4)
+G_solver = (tf.train.AdamOptimizer(learning_rate=1e-3)
             .minimize(G_loss, var_list=theta_G))
 
 sess = tf.Session(config=config)
 init = tf.global_variables_initializer()
 sess.run(init)
 
-if not os.path.exists('out/'):
-    os.makedirs('out/')
+if not os.path.exists('out_nolog/'):
+    os.makedirs('out_nolog/')
 
 i = 0
 
@@ -142,12 +142,12 @@ for it in range(1, 1000001):
     if it % 10000 == 0:
         print('Iter: {}; D_loss: {:.4}; G_loss: {:.4}; E_loss: {:.4}'
               .format(it, D_loss_curr, G_loss_curr, E_loss_curr))
-        saver.save(sess, "out/model.ckpt")
+        saver.save(sess, "out_nolog/model.ckpt")
 
         samples = sess.run(G_sample, feed_dict={z: sample_z(16, z_dim)})
 
         fig = plot(samples)
-        plt.savefig('out/{}.png'
+        plt.savefig('out_nolog/{}.png'
                     .format(str(i).zfill(3)), bbox_inches='tight')
         i += 1
         plt.close(fig)

@@ -1,12 +1,16 @@
 import tensorflow as tf
 from tensorflow.examples.tutorials.mnist import input_data
 import numpy as np
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import os
 
+gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.333)
+config = tf.ConfigProto(gpu_options=gpu_options)
 
-mnist = input_data.read_data_sets('../../MNIST_data', one_hot=True)
+mnist = input_data.read_data_sets('../../../mnist', one_hot=True)
 mb_size = 64
 Z_dim = 100
 X_dim = mnist.train.images.shape[1]
@@ -34,7 +38,7 @@ theta_D = [D_W1, D_W2, D_b1, D_b2]
 
 
 def discriminator(x, y):
-    inputs = tf.concat(concat_dim=1, values=[x, y])
+    inputs = tf.concat([x, y], 1)
     D_h1 = tf.nn.relu(tf.matmul(inputs, D_W1) + D_b1)
     D_logit = tf.matmul(D_h1, D_W2) + D_b2
     D_prob = tf.nn.sigmoid(D_logit)
@@ -55,7 +59,7 @@ theta_G = [G_W1, G_W2, G_b1, G_b2]
 
 
 def generator(z, y):
-    inputs = tf.concat(concat_dim=1, values=[z, y])
+    inputs = tf.concat([z, y], 1)
     G_h1 = tf.nn.relu(tf.matmul(inputs, G_W1) + G_b1)
     G_log_prob = tf.matmul(G_h1, G_W2) + G_b2
     G_prob = tf.nn.sigmoid(G_log_prob)
@@ -87,25 +91,30 @@ G_sample = generator(Z, y)
 D_real, D_logit_real = discriminator(X, y)
 D_fake, D_logit_fake = discriminator(G_sample, y)
 
-D_loss_real = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(D_logit_real, tf.ones_like(D_logit_real)))
-D_loss_fake = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(D_logit_fake, tf.zeros_like(D_logit_fake)))
+D_loss_real = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=D_logit_real,
+    labels=tf.ones_like(D_logit_real)))
+D_loss_fake = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=D_logit_fake,
+    labels=tf.zeros_like(D_logit_fake)))
 D_loss = D_loss_real + D_loss_fake
-G_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(D_logit_fake, tf.ones_like(D_logit_fake)))
+G_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
+    logits=D_logit_fake, labels=tf.ones_like(D_logit_fake)))
 
 D_solver = tf.train.AdamOptimizer().minimize(D_loss, var_list=theta_D)
 G_solver = tf.train.AdamOptimizer().minimize(G_loss, var_list=theta_G)
 
 
-sess = tf.Session()
-sess.run(tf.initialize_all_variables())
+sess = tf.Session(config=config)
+init = tf.global_variables_initializer()
+sess.run(init)
 
 if not os.path.exists('out/'):
     os.makedirs('out/')
 
 i = 0
 
-for it in range(1000000):
-    if it % 1000 == 0:
+saver = tf.train.Saver()
+for it in range(1, 1000000):
+    if it % 10000 == 0:
         n_sample = 16
 
         Z_sample = sample_Z(n_sample, Z_dim)
@@ -125,8 +134,10 @@ for it in range(1000000):
     _, D_loss_curr = sess.run([D_solver, D_loss], feed_dict={X: X_mb, Z: Z_sample, y:y_mb})
     _, G_loss_curr = sess.run([G_solver, G_loss], feed_dict={Z: Z_sample, y:y_mb})
 
-    if it % 1000 == 0:
+    if it % 10000 == 0:
         print('Iter: {}'.format(it))
         print('D loss: {:.4}'. format(D_loss_curr))
         print('G_loss: {:.4}'.format(G_loss_curr))
         print()
+        saver.save(sess, "out/model.ckpt")
+

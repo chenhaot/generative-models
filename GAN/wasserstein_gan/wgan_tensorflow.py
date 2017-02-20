@@ -1,17 +1,21 @@
 import tensorflow as tf
 from tensorflow.examples.tutorials.mnist import input_data
 import numpy as np
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import os
 
+gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.333)
+config = tf.ConfigProto(gpu_options=gpu_options)
 
 mb_size = 32
 X_dim = 784
 z_dim = 10
 h_dim = 128
 
-mnist = input_data.read_data_sets('../../MNIST_data', one_hot=True)
+mnist = input_data.read_data_sets('../../../mnist', one_hot=True)
 
 
 def plot(samples):
@@ -89,15 +93,17 @@ G_solver = (tf.train.RMSPropOptimizer(learning_rate=1e-4)
 
 clip_D = [p.assign(tf.clip_by_value(p, -0.01, 0.01)) for p in theta_D]
 
-sess = tf.Session()
-sess.run(tf.initialize_all_variables())
+sess = tf.Session(config=config)
+init = tf.global_variables_initializer()
+sess.run(init)
 
 if not os.path.exists('out/'):
     os.makedirs('out/')
 
 i = 0
 
-for it in range(1000000):
+saver = tf.train.Saver()
+for it in range(1, 1000001):
     for _ in range(5):
         X_mb, _ = mnist.train.next_batch(mb_size)
 
@@ -111,11 +117,12 @@ for it in range(1000000):
         feed_dict={z: sample_z(mb_size, z_dim)}
     )
 
-    if it % 100 == 0:
+    if it % 1000 == 0:
         print('Iter: {}; D loss: {:.4}; G_loss: {:.4}'
               .format(it, D_loss_curr, G_loss_curr))
 
-        if it % 1000 == 0:
+        if it % 10000 == 0:
+            saver.save(sess, "out/model.ckpt")
             samples = sess.run(G_sample, feed_dict={z: sample_z(16, z_dim)})
 
             fig = plot(samples)

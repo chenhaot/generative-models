@@ -1,6 +1,8 @@
 import tensorflow as tf
 from tensorflow.examples.tutorials.mnist import input_data
 import numpy as np
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import os
@@ -53,7 +55,7 @@ def sample_c(m):
 
 
 def generator(z, c):
-    inputs = tf.concat(1, [z, c])
+    inputs = tf.concat([z, c], 1)
     G_h1 = tf.nn.relu(tf.matmul(inputs, G_W1) + G_b1)
     G_log_prob = tf.matmul(G_h1, G_W2) + G_b2
     G_prob = tf.nn.sigmoid(G_log_prob)
@@ -111,18 +113,20 @@ Q_solver = tf.train.AdamOptimizer().minimize(Q_loss, var_list=theta_G + theta_Q)
 mb_size = 32
 Z_dim = 16
 
-mnist = input_data.read_data_sets('../../MNIST_data', one_hot=True)
+mnist = input_data.read_data_sets('../../../mnist', one_hot=True)
 
 sess = tf.Session()
-sess.run(tf.initialize_all_variables())
+init = tf.global_variables_initializer()
+sess.run(init)
 
 if not os.path.exists('out/'):
     os.makedirs('out/')
 
 i = 0
 
-for it in range(1000000):
-    if it % 1000 == 0:
+saver = tf.train.Saver()
+for it in range(1, 1000001):
+    if it % 10000 == 0:
         Z_noise = sample_Z(16, Z_dim)
 
         idx = np.random.randint(0, 10)
@@ -149,8 +153,10 @@ for it in range(1000000):
 
     sess.run([Q_solver], feed_dict={Z: Z_noise, c: c_noise})
 
-    if it % 1000 == 0:
+    if it % 10000 == 0:
         print('Iter: {}'.format(it))
         print('D loss: {:.4}'. format(D_loss_curr))
         print('G_loss: {:.4}'.format(G_loss_curr))
         print()
+        saver.save(sess, "out/model.ckpt")
+
